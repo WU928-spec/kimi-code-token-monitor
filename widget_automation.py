@@ -1,3 +1,8 @@
+"""Kimi Work Blueprint Automation 采集脚本（非独立运行，由 Blueprint 运行时调用 run(ctx)）。
+
+每 5 分钟扫描 ~/.kimi-code/sessions 下全部 wire.jsonl，按行 hash 全局去重
+汇总 usage.record 的 token 用量，产出结构化 artifact 推送给绑定的 Widget。
+"""
 import json, glob, os, hashlib, datetime, collections
 
 ROOT = os.path.expanduser("~/.kimi-code/sessions")
