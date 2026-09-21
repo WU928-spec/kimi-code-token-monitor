@@ -1,0 +1,3 @@
+__pycache__/
+.token_monitor_state.json
+.DS_Store
