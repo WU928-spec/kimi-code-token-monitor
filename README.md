@@ -2,6 +2,8 @@
 
 统计并实时监控本机 Kimi Code（kimi-code CLI）的模型 token 消耗。零依赖，Python 3.8+，单文件 CLI。
 
+![demo](demo.png)
+
 ## 快速开始
 
 ```bash
