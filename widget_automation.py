@@ -1,8 +1,56 @@
-import json, glob, os, hashlib, datetime, collections
+import json, glob, os, hashlib, datetime, collections, urllib.request
 
 ROOT = os.path.expanduser("~/.kimi-code/sessions")
 KEYS = ("inputOther", "inputCacheRead", "inputCacheCreation", "output")
 WIN = 5 * 3600 * 1000  # 5 小时窗口 (ms)
+API = "https://api.kimi.com/coding/v1/usages"
+
+
+def load_api_key(ctx):
+    """Key 优先取 run input (x-secret), 兜底读 assets/.apikey (本机文件, 600 权限)。"""
+    inp = (ctx or {}).get("input") or {}
+    key = inp.get("apiKey")
+    if key:
+        return key
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        return open(os.path.join(here, ".apikey"), encoding="ascii").read().strip()
+    except OSError:
+        return None
+
+
+def fetch_quota(api_key):
+    """查询 Kimi Code 会员额度 (5h / 月度窗口, 官方口径)。失败返回 None。"""
+    if not api_key:
+        return {"error": "api key 未配置"}
+    try:
+        req = urllib.request.Request(API, headers={
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": "KimiCLI/1.6",
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            d = json.loads(resp.read().decode("utf-8"))
+        u = d.get("usages") or {}
+
+        def win(key):
+            w = u.get(key)
+            if not w:
+                return None
+            return {"usedRatio": w.get("used_ratio"), "resetTime": w.get("reset_time")}
+
+        limit5h = (d.get("limits") or [{}])[0].get("detail") or {}
+        booster = d.get("booster_wallet") or {}
+        bal = booster.get("balance") or {}
+        return {
+            "fiveHour": win("limit_5h"),
+            "monthTotal": win("limit_month_total"),
+            "monthCode": win("limit_month_code"),
+            "fiveHourDetail": {"limit": limit5h.get("limit"), "used": limit5h.get("used")},
+            "booster": {"balance": bal.get("amount"), "monthlyUsedCents": (booster.get("monthlyUsed") or {}).get("priceInCents")},
+        }
+    except Exception as e:
+        return {"error": str(e)[:200]}
+
 
 def run(ctx):
     seen = set()
@@ -82,4 +130,5 @@ def run(ctx):
                         "inputCacheRead": c["inputCacheRead"], "records": kimi5h_n[w]}
                        for w, c in sorted(kimi5h.items())][-48:],
         },
+        "quota": fetch_quota(load_api_key(ctx)),
     }}
