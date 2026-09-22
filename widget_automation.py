@@ -62,8 +62,10 @@ def run(ctx):
     day_n = collections.Counter()
     kimi5h = collections.defaultdict(collections.Counter)   # 按小时区间 (kimi 模型, 近48h)
     kimi5h_n = collections.Counter()
-    rolling = collections.Counter()  # 当前滚动 5h (kimi 模型)
+    rolling = collections.Counter()  # 当前滚动 5h (kimi 模型合计)
     rolling_n = 0
+    rolling_models = collections.defaultdict(collections.Counter)  # 滚动 5h 分模型
+    rolling_models_n = collections.Counter()
     n = 0
     day = datetime.date.today().isoformat()
     now = datetime.datetime.now()
@@ -108,8 +110,11 @@ def run(ctx):
                         kimi5h[label][k] += u.get(k, 0)
                     if now_ms - t <= WIN:
                         rolling_n += 1
+                        rolling_models_n[m] += 1
                         for k in KEYS:
-                            rolling[k] += u.get(k, 0)
+                            v = u.get(k, 0)
+                            rolling[k] += v
+                            rolling_models[m][k] += v
 
     return {"artifact": {
         "updatedAt": now.strftime("%Y-%m-%d %H:%M:%S"),
@@ -126,6 +131,9 @@ def run(ctx):
         "kimi": {
             "rolling5h": {"inputOther": rolling["inputOther"], "inputCacheRead": rolling["inputCacheRead"],
                            "output": rolling["output"], "records": rolling_n},
+            "rolling5hByModel": [{"model": m, "output": c["output"], "inputOther": c["inputOther"],
+                                   "inputCacheRead": c["inputCacheRead"], "records": rolling_models_n[m]}
+                                  for m, c in sorted(rolling_models.items(), key=lambda x: -x[1]["output"])],
             "byHour": [{"window": w, "output": c["output"], "inputOther": c["inputOther"],
                         "inputCacheRead": c["inputCacheRead"], "records": kimi5h_n[w]}
                        for w, c in sorted(kimi5h.items())][-48:],
